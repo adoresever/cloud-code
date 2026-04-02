@@ -5,6 +5,13 @@
  * 1. system prompt: top-level `system` field → messages[0] role=system
  * 2. multimodal: image.source.base64 → image_url with data URI
  * 3. tools: input_schema → function.parameters; tool_result → role=tool
+ *
+ * FIX(2026-04-02): Anthropic API allows consecutive same-role messages,
+ * but OpenAI format requires strict user/assistant alternation. Claude Code
+ * splits a single assistant turn into multiple messages (thinking-only +
+ * text + tool_use), which produces consecutive assistant messages that
+ * break third-party OpenAI-compatible APIs. The postprocessMessages()
+ * step merges them back into single messages.
  */
 
 export interface OpenAICompatRequestConfig {
@@ -79,8 +86,95 @@ function convertMessages(params: Record<string, any>): any[] {
     }
   }
 
-  return messages
+  // FIX: Postprocess to ensure OpenAI-compatible message sequence
+  return postprocessMessages(messages)
 }
+
+// ---------------------------------------------------------------------------
+// FIX: Postprocess — merge consecutive same-role & drop empty messages
+// ---------------------------------------------------------------------------
+
+/**
+ * OpenAI chat completion API requires strict role alternation:
+ *   system? → user → assistant → user → assistant → ...
+ *
+ * Anthropic API allows consecutive same-role messages. Claude Code exploits
+ * this heavily — a single assistant "turn" may be split across 2-4 messages:
+ *   assistant: [thinking only]     ← content becomes "" after conversion
+ *   assistant: [text]              ← actual reply
+ *   assistant: [tool_use]          ← tool calls
+ *
+ * Third-party APIs (MiniMax, GLM, Qwen, DeepSeek via gateways) handle this
+ * violation unpredictably: some silently drop earlier messages, some truncate
+ * history, some error out. This function normalizes the sequence.
+ */
+function postprocessMessages(messages: any[]): any[] {
+  const result: any[] = []
+
+  for (const msg of messages) {
+    // Skip completely empty assistant messages (thinking-only after conversion)
+    if (
+      msg.role === 'assistant' &&
+      !msg.content &&
+      (!msg.tool_calls || msg.tool_calls.length === 0)
+    ) {
+      continue
+    }
+
+    const prev = result[result.length - 1]
+
+    // Merge consecutive assistant messages
+    if (prev && prev.role === 'assistant' && msg.role === 'assistant') {
+      // Merge text content
+      const prevText = prev.content || ''
+      const curText = msg.content || ''
+      if (curText) {
+        prev.content = prevText ? prevText + '\n' + curText : curText
+      }
+      // Merge tool_calls arrays
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        if (!prev.tool_calls) {
+          prev.tool_calls = []
+        }
+        prev.tool_calls.push(...msg.tool_calls)
+      }
+      continue
+    }
+
+    // Merge consecutive user messages (can happen after tool_result expansion)
+    if (prev && prev.role === 'user' && msg.role === 'user') {
+      const prevText =
+        typeof prev.content === 'string'
+          ? prev.content
+          : Array.isArray(prev.content)
+            ? prev.content
+                .map((b: any) => (b.type === 'text' ? b.text : ''))
+                .join('')
+            : ''
+      const curText =
+        typeof msg.content === 'string'
+          ? msg.content
+          : Array.isArray(msg.content)
+            ? msg.content
+                .map((b: any) => (b.type === 'text' ? b.text : ''))
+                .join('')
+            : ''
+      if (curText) {
+        prev.content = prevText ? prevText + '\n' + curText : curText
+      }
+      continue
+    }
+
+    // Normal case: different role, just push
+    result.push({ ...msg })
+  }
+
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// Assistant message conversion
+// ---------------------------------------------------------------------------
 
 function convertAssistantMessage(msg: Record<string, any>): Record<string, any> {
   const content = msg.content
@@ -130,6 +224,10 @@ function convertAssistantMessage(msg: Record<string, any>): Record<string, any> 
   if (!textContent && toolCalls.length === 0) result.content = ''
   return result
 }
+
+// ---------------------------------------------------------------------------
+// User message conversion
+// ---------------------------------------------------------------------------
 
 function convertUserMessage(msg: Record<string, any>): any {
   const content = msg.content

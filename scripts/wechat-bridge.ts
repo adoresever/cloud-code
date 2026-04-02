@@ -10,13 +10,14 @@
  *   - 视频收发（CDN 加解密）
  *   - Typing 状态（"对方正在输入中"）
  *   - 24h Token 过期自动提示重新扫码
+ *   - 多轮对话上下文保持（-c --continue）
  *
  * 用法:
  *   bun run scripts/wechat-bridge.ts              # 启动（有凭证自动连，无则扫码）
  *   bun run scripts/wechat-bridge.ts --login      # 强制重新扫码
  *
  * 架构:
- *   微信用户 → iLink API → [本脚本] → bun run cli.tsx -p → OpenAI适配层 → LLM API
+ *   微信用户 → iLink API → [本脚本] → bun run cli.tsx -p -c → OpenAI适配层 → LLM API
  *
  * 开源协议: MIT
  */
@@ -134,7 +135,8 @@ async function stopTyping(userId: string) {
 
 function callCloudCode(prompt: string, cwd?: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const proc = spawn("bun", ["run", CLI_ENTRY, "-p", prompt], {
+    // -p: pipe模式  -c: --continue 复用最近的 session（多轮对话）
+    const proc = spawn("bun", ["run", CLI_ENTRY, "-p", "-c", prompt], {
       cwd: cwd || CLOUD_CODE_DIR,
       env: { ...process.env },
       stdio: ["pipe", "pipe", "pipe"],
@@ -380,8 +382,9 @@ async function mainLoop() {
 
 async function main() {
   console.log("┌─────────────────────────────────────────────────┐");
-  console.log("│  cloud-code 微信桥接 v2.0                       │");
+  console.log("│  cloud-code 微信桥接 v2.1                       │");
   console.log("│  支持: 文字 · 图片 · 文件 · 语音 · 视频         │");
+  console.log("│  新增: 多轮对话上下文保持 (-c)                   │");
   console.log("│  协议: 腾讯官方 iLink Bot API (不会封号)        │");
   console.log("└─────────────────────────────────────────────────┘\n");
 
@@ -414,6 +417,7 @@ async function main() {
   process.on("SIGTERM", exit);
 
   log("INIT", "✅ 就绪，在微信中给 ClawBot 发消息即可");
+  log("INIT", "   所有消息在同一个 session 中（多轮对话）");
   log("INIT", "   Ctrl+C 退出\n");
 
   await mainLoop();
