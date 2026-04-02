@@ -1,4 +1,4 @@
-import { feature } from 'bun:bundle';
+import { feature } from 'bun:bundle'
 import chalk from 'chalk';
 import React, { useMemo, useRef } from 'react';
 import { useVoiceState } from '../context/voice.js';

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cloud Code /buddy 宠物图鉴</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #fafafa; color: #1a1a1a; font-family: 'Noto Sans SC', sans-serif; padding: 40px 20px; }
+  .container { max-width: 960px; margin: 0 auto; }
+
+  /* 头部 */
+  .header { text-align: center; margin-bottom: 40px; }
+  .header h1 { font-size: 28px; font-weight: 700; color: #111; }
+  .header h1 span { color: #e53e3e; }
+  .header p { font-size: 13px; color: #888; margin-top: 8px; line-height: 1.6; }
+
+  /* 抽卡区 */
+  .roller { background: #fff; border: 1px solid #e5e5e5; border-radius: 14px; padding: 24px 28px; margin-bottom: 36px; }
+  .roller h2 { font-size: 16px; font-weight: 600; margin-bottom: 14px; color: #333; }
+  .roller-row { display: flex; gap: 10px; align-items: stretch; }
+  .roller-row input { flex: 1; border: 1px solid #ddd; border-radius: 8px; padding: 10px 14px; font-size: 13px; font-family: 'JetBrains Mono', monospace; color: #333; outline: none; }
+  .roller-row input:focus { border-color: #e53e3e; }
+  .roller-row input::placeholder { color: #bbb; }
+  .roller-row button { background: #e53e3e; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit; }
+  .roller-row button:hover { background: #c53030; }
+  .salt-row { display: flex; gap: 10px; margin-top: 10px; }
+  .salt-row input { flex: 1; border: 1px solid #ddd; border-radius: 8px; padding: 10px 14px; font-size: 12px; font-family: 'JetBrains Mono', monospace; color: #666; outline: none; }
+  .salt-row input:focus { border-color: #e53e3e; }
+  .hint { font-size: 11px; color: #aaa; margin-top: 8px; line-height: 1.5; }
+
+  /* 抽卡结果 */
+  .result { display: none; margin-top: 20px; background: #f8f8f8; border: 1px solid #eee; border-radius: 12px; padding: 20px; text-align: center; }
+  .result.show { display: block; }
+  .result .rarity-tag { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+  .result .shiny-tag { color: #d69e2e; font-size: 10px; font-weight: 700; letter-spacing: 3px; }
+  .result pre.sprite { font-family: 'JetBrains Mono', monospace; font-size: 14px; line-height: 17px; margin: 10px 0; display: inline-block; text-align: left; }
+  .result .buddy-name { font-size: 18px; font-weight: 700; color: #111; }
+  .result .buddy-meta { font-size: 11px; color: #888; margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+  .result .stats { display: flex; gap: 16px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+  .result .stat { text-align: center; }
+  .result .stat .sn { font-size: 9px; color: #999; display: block; }
+  .result .stat .sv { font-size: 16px; font-weight: 700; }
+
+  /* 分隔线 */
+  .divider { height: 1px; background: #eee; margin: 36px 0; }
+
+  /* 图鉴区 */
+  .codex h2 { font-size: 18px; font-weight: 700; color: #111; margin-bottom: 6px; }
+  .codex p { font-size: 12px; color: #999; margin-bottom: 20px; }
+
+  /* 稀有度分区 */
+  .rarity-section { margin-bottom: 32px; }
+  .rarity-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid #eee; }
+  .rarity-header .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .rarity-header .label { font-size: 14px; font-weight: 600; }
+  .rarity-header .prob { font-size: 11px; color: #aaa; }
+
+  .species-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .species-card { background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 12px 8px; width: 140px; text-align: center; transition: all .15s; }
+  .species-card:hover { border-color: #ccc; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+  .species-card pre { font-family: 'JetBrains Mono', monospace; font-size: 10px; line-height: 13px; margin: 0; display: inline-block; text-align: left; }
+  .species-card .sp-name { font-size: 11px; font-weight: 600; color: #333; margin-top: 6px; }
+  .species-card .sp-cn { font-size: 10px; color: #999; }
+
+  /* 概率表 */
+  .prob-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
+  .prob-table th { background: #f5f5f5; padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #eee; }
+  .prob-table td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
+  .prob-table tr:hover { background: #fafafa; }
+
+  .footer { margin-top: 40px; text-align: center; font-size: 10px; color: #ccc; line-height: 1.8; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="header">
+    <h1>Cloud Code <span>/buddy</span> 宠物图鉴</h1>
+    <p>源自 Claude Code v2.1.88 泄露源码中的隐藏 Tamagotchi 宠物系统<br>18 个物种 · 5 个稀有度 · 1% 独立闪光概率 · 确定性抽卡</p>
+  </div>
+
+  <!-- 抽卡预览 -->
+  <div class="roller">
+    <h2>🎲 输入 userId 预览你的 Buddy</h2>
+    <div class="roller-row">
+      <input type="text" id="uid" placeholder="粘贴你的 userId（从 ~/.claude.json 的 userID 字段获取）">
+      <button onclick="doRoll()">抽卡预览</button>
+    </div>
+    <div class="salt-row">
+      <input type="text" id="saltInput" placeholder="SALT 值（默认 friend-2026-401）" value="friend-2026-401">
+    </div>
+    <div class="hint">💡 同一 userId + SALT 永远生成同一只 buddy。改 SALT 可以换一只。</div>
+    <div class="result" id="result"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 稀有度概率表 -->
+  <div class="codex">
+    <h2>📊 稀有度体系</h2>
+    <p>每只 buddy 的稀有度由 PRNG 掷骰决定，Shiny 是独立的 1% 概率叠加</p>
+    <table class="prob-table">
+      <tr><th>稀有度</th><th>概率</th><th>星级</th><th>帽子</th><th>属性下限</th><th>最稀有组合概率</th></tr>
+      <tr><td>⬜ Common</td><td>60%</td><td>★</td><td>无</td><td>5</td><td>Shiny Common: 0.6%</td></tr>
+      <tr><td>🟩 Uncommon</td><td>25%</td><td>★★</td><td>随机</td><td>15</td><td>Shiny Uncommon: 0.25%</td></tr>
+      <tr><td>🟦 Rare</td><td>10%</td><td>★★★</td><td>随机</td><td>25</td><td>Shiny Rare: 0.1%</td></tr>
+      <tr><td>🟨 Epic</td><td>4%</td><td>★★★★</td><td>随机</td><td>35</td><td>Shiny Epic: 0.04%</td></tr>
+      <tr><td style="color:#e53e3e;font-weight:700">🟥 Legendary</td><td style="font-weight:700">1%</td><td>★★★★★</td><td>随机</td><td>50</td><td style="color:#d69e2e;font-weight:700">✦ Shiny Legendary: 0.01%</td></tr>
+    </table>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 物种图鉴 -->
+  <div class="codex">
+    <h2>📖 全物种图鉴</h2>
+    <p>按稀有度分区展示所有 18 个物种的 ASCII 精灵（示例使用 · 眼型，无帽子）</p>
+    <div id="codex-content"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 装饰系统 -->
+  <div class="codex">
+    <h2>🎨 装饰系统</h2>
+    <p>每只 buddy 的眼型和帽子由抽卡随机决定</p>
+    <table class="prob-table">
+      <tr><th>类型</th><th>可选项</th><th>说明</th></tr>
+      <tr><td>👁 眼型（6种）</td><td style="font-family:'JetBrains Mono',monospace;font-size:16px;letter-spacing:8px">· ✦ × ◉ @ °</td><td>所有稀有度均可获得</td></tr>
+      <tr><td>🎩 帽子（7种）</td><td>👑 crown · 🎩 tophat · ⚙️ propeller · 😇 halo · 🧙 wizard · 🧶 beanie · 🦆 tinyduck</td><td>Common 无帽子，Uncommon+ 随机获得</td></tr>
+    </table>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 属性系统 -->
+  <div class="codex">
+    <h2>📈 属性系统</h2>
+    <p>每只 buddy 有 5 个属性，一个高峰、一个低谷、其余随机</p>
+    <table class="prob-table">
+      <tr><th>属性</th><th>含义</th><th>范围</th></tr>
+      <tr><td>🐛 DEBUGGING</td><td>调试能力</td><td>1 ~ 100</td></tr>
+      <tr><td>🧘 PATIENCE</td><td>耐心程度</td><td>1 ~ 100</td></tr>
+      <tr><td>🌀 CHAOS</td><td>混乱值</td><td>1 ~ 100</td></tr>
+      <tr><td>📚 WISDOM</td><td>智慧等级</td><td>1 ~ 100</td></tr>
+      <tr><td>😏 SNARK</td><td>毒舌指数</td><td>1 ~ 100</td></tr>
+    </table>
+    <div class="hint" style="margin-top:10px">Legendary 的属性下限为 50，高峰属性可达 100；Common 下限仅为 5。</div>
+  </div>
+
+  <div class="footer">
+    Cloud Code /buddy 宠物图鉴 · 基于泄露源码 src/buddy/ 完整移植<br>
+    Mulberry32 PRNG · FNV-1a Hash · 18 物种 × 5 稀有度 × 6 眼型 × 7 帽子
+  </div>
+
+</div>
+
+<script>
+// === 完整移植 companion.ts + types.ts + sprites.ts ===
+const SPECIES=["duck","goose","blob","cat","dragon","octopus","owl","penguin","turtle","snail","ghost","axolotl","capybara","cactus","robot","rabbit","mushroom","chonk"];
+const RARITIES=["common","uncommon","rare","epic","legendary"];
+const W={common:60,uncommon:25,rare:10,epic:4,legendary:1};
+const EYES=["·","✦","×","◉","@","°"];
+const HATS=["none","crown","tophat","propeller","halo","wizard","beanie","tinyduck"];
+const STATS=["DEBUGGING","PATIENCE","CHAOS","WISDOM","SNARK"];
+const FLOOR={common:5,uncommon:15,rare:25,epic:35,legendary:50};
+const COLORS={common:"#999",uncommon:"#16a34a",rare:"#2563eb",epic:"#d97706",legendary:"#dc2626"};
+const STARS={common:"★",uncommon:"★★",rare:"★★★",epic:"★★★★",legendary:"★★★★★"};
+const NAMES={duck:"Quackers 小黄鸭",goose:"Honk 大鹅",blob:"Blobby 果冻",cat:"Whiskers 喵",dragon:"Ember 龙",octopus:"Inky 章鱼",owl:"Hoot 猫头鹰",penguin:"Waddle 企鹅",turtle:"Shell 龟龟",snail:"Slime 蜗牛",ghost:"Boo 幽灵",axolotl:"Axel 六角龙",capybara:"Capy 水豚",cactus:"Spike 仙人掌",robot:"Beep 机器人",rabbit:"Flopsy 兔兔",mushroom:"Spore 蘑菇",chonk:"Chonkers 胖猫"};
+const CN={duck:"小黄鸭",goose:"大鹅",blob:"果冻",cat:"猫咪",dragon:"火龙",octopus:"章鱼",owl:"猫头鹰",penguin:"企鹅",turtle:"乌龟",snail:"蜗牛",ghost:"幽灵",axolotl:"六角恐龙",capybara:"水豚",cactus:"仙人掌",robot:"机器人",rabbit:"兔子",mushroom:"蘑菇",chonk:"胖橘"};
+const HAT_E={none:"—",crown:"👑",tophat:"🎩",propeller:"⚙️",halo:"😇",wizard:"🧙",beanie:"🧶",tinyduck:"🦆"};
+const STAT_E={DEBUGGING:"🐛",PATIENCE:"🧘",CHAOS:"🌀",WISDOM:"📚",SNARK:"😏"};
+
+function m32(seed){let a=seed>>>0;return function(){a|=0;a=(a+0x6d2b79f5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function pick(r,a){return a[Math.floor(r()*a.length)];}
+function rollR(r){let v=r()*100;for(const x of RARITIES){v-=W[x];if(v<0)return x;}return"common";}
+function rollStats(r,rar){const f=FLOOR[rar],pk=pick(r,STATS);let dp=pick(r,STATS);while(dp===pk)dp=pick(r,STATS);const s={};for(const n of STATS){if(n===pk)s[n]=Math.min(100,f+50+Math.floor(r()*30));else if(n===dp)s[n]=Math.max(1,f-10+Math.floor(r()*15));else s[n]=f+Math.floor(r()*40);}return s;}
+
+function roll(uid,salt){
+  const r=m32(hash(uid+salt));
+  const rar=rollR(r),sp=pick(r,SPECIES),eye=pick(r,EYES);
+  const hat=rar==="common"?"none":pick(r,HATS);
+  const shiny=r()<0.01;
+  const stats=rollStats(r,rar);
+  return{rarity:rar,species:sp,eye,hat,shiny,stats};
+}
+
+// sprites
+const E="{E}";
+const B={
+  duck:["            ","    __      ",`  <(\${E} )___  `,"   (  ._>   ","    \`--´    "],
+  goose:["            ",`     (\${E}>    `,"     ||     ","   _(__)_   ","    ^^^^    "],
+  blob:["            ","   .----.   ",`  ( \${E}  \${E} )  `,"  (      )  ","   \`----´   "],
+  cat:["            ","   /\\_/\\    ",`  ( \${E}   \${E})  `,"  (  ω  )   ",'  (")_(")   '],
+  dragon:["            ","  /^\\  /^\\  ",` <  \${E}  \${E}  > `," (   ~~   ) ","  \`-vvvv-´  "],
+  octopus:["            ","   .----.   ",`  ( \${E}  \${E} )  `,"  (______)  ","  /\\/\\/\\/\\  "],
+  owl:["            ","   /\\  /\\   ",`  ((\${E})(\${E}))  `,"  (  ><  )  ","   \`----´   "],
+  penguin:["            ","  .---.     ",`  (\${E}>\${E})     `," /(   )\\    ","  \`---´     "],
+  turtle:["            ","   _,--._   ",`  ( \${E}  \${E} )  `," /[______]\\ ","  \`\`    \`\`  "],
+  snail:["            ",` \${E}    .--.  `,"  \\  ( @ )  ","   \\_\`--´   ","  ~~~~~~~   "],
+  ghost:["            ","   .----.   ",`  / \${E}  \${E} \\  `,"  |      |  ","  ~\`~\`\`~\`~  "],
+  axolotl:["            ",`}~(______)~{`,`}~(\${E} .. \${E})~{`,"  ( .--. )  ","  (_/  \\_)  "],
+  capybara:["            ","  n______n  ",` ( \${E}    \${E} ) `," (   oo   ) ","  \`------´  "],
+  cactus:["            "," n  ____  n ",` | |\${E}  \${E}| | `," |_|    |_| ","   |    |   "],
+  robot:["            ","   .[||].   ",`  [ \${E}  \${E} ]  `,"  [ ==== ]  ","  \`------´  "],
+  rabbit:["            ","   (\\__/)   ",`  ( \${E}  \${E} )  `," =(  ..  )= ",'  (")__(")  '],
+  mushroom:["            "," .-o-OO-o-. ","(__________)",`   |\${E}  \${E}|   `,"   |____|   "],
+  chonk:["            ","  /\\    /\\  ",` ( \${E}    \${E} ) `," (   ..   ) ","  \`------´  "],
+};
+const HL={none:"",crown:"   \\^^^/    ",tophat:"   [___]    ",propeller:"    -+-     ",halo:"   (   )    ",wizard:"    /^\\     ",beanie:"   (___)    ",tinyduck:"    ,>      "};
+
+function sprite(sp,eye,hat){
+  const lines=B[sp].map(l=>l.replaceAll("${E}",eye));
+  if(hat!=="none"&&!lines[0].trim())lines[0]=HL[hat];
+  if(!lines[0].trim())lines.shift();
+  return lines;
+}
+
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+// 抽卡
+function doRoll(){
+  const uid=document.getElementById("uid").value.trim()||"anon";
+  const salt=document.getElementById("saltInput").value.trim()||"friend-2026-401";
+  const b=roll(uid,salt);
+  const sp=sprite(b.species,b.eye,b.hat);
+  const c=COLORS[b.rarity];
+  const statsHtml=STATS.map(s=>`<div class="stat"><span class="sn">${STAT_E[s]} ${s}</span><span class="sv" style="color:${c}">${b.stats[s]}</span></div>`).join("");
+
+  document.getElementById("result").innerHTML=`
+    <div class="rarity-tag" style="color:${c}">${STARS[b.rarity]} ${b.rarity.toUpperCase()}</div>
+    ${b.shiny?'<div class="shiny-tag">✦ SHINY ✦</div>':""}
+    <pre class="sprite" style="color:${c};${b.shiny?"text-shadow:0 0 8px rgba(214,158,46,.6);":""}">
+${sp.map(l=>esc(l)).join("\n")}</pre>
+    <div class="buddy-name">${CN[b.species]}</div>
+    <div class="buddy-meta">${b.species} · eye: ${b.eye} · hat: ${b.hat} ${HAT_E[b.hat]}</div>
+    <div class="stats">${statsHtml}</div>
+  `;
+  document.getElementById("result").classList.add("show");
+}
+
+// 图鉴
+function buildCodex(){
+  // 按"稀有度展示不同帽子效果"分区，但物种本身是通用的
+  // 这里按概念分组展示所有 18 个物种
+  const groups = [
+    {label:"🟥 Legendary",color:"#dc2626",prob:"1%",desc:"最高稀有度，属性下限 50，随机帽子"},
+    {label:"🟨 Epic",color:"#d97706",prob:"4%",desc:"属性下限 35，随机帽子"},
+    {label:"🟦 Rare",color:"#2563eb",prob:"10%",desc:"属性下限 25，随机帽子"},
+    {label:"🟩 Uncommon",color:"#16a34a",prob:"25%",desc:"属性下限 15，随机帽子"},
+    {label:"⬜ Common",color:"#999",prob:"60%",desc:"属性下限 5，无帽子"},
+  ];
+
+  // 物种不区分稀有度（任何稀有度都可以出任何物种），所以图鉴只展示全物种
+  let html = `<div class="rarity-section">
+    <div class="rarity-header">
+      <div class="label">全部 18 个物种</div>
+      <div class="prob">任何稀有度均可获得任何物种</div>
+    </div>
+    <div class="species-grid">`;
+
+  for(const sp of SPECIES){
+    const lines = sprite(sp, "·", "none");
+    html += `<div class="species-card">
+      <pre>${lines.map(l=>esc(l)).join("\n")}</pre>
+      <div class="sp-name">${sp}</div>
+      <div class="sp-cn">${CN[sp]}</div>
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  // 帽子效果展示
+  html += `<div class="rarity-section" style="margin-top:24px">
+    <div class="rarity-header">
+      <div class="label">帽子效果展示</div>
+      <div class="prob">以 dragon 为例，展示所有 7 种帽子</div>
+    </div>
+    <div class="species-grid">`;
+
+  for(const hat of HATS.filter(h=>h!=="none")){
+    const lines = sprite("dragon", "◉", hat);
+    html += `<div class="species-card">
+      <pre style="color:#dc2626">${lines.map(l=>esc(l)).join("\n")}</pre>
+      <div class="sp-name">${HAT_E[hat]} ${hat}</div>
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  // 眼型展示
+  html += `<div class="rarity-section" style="margin-top:24px">
+    <div class="rarity-header">
+      <div class="label">眼型效果展示</div>
+      <div class="prob">以 cat 为例，展示所有 6 种眼型</div>
+    </div>
+    <div class="species-grid">`;
+
+  for(const eye of EYES){
+    const lines = sprite("cat", eye, "none");
+    html += `<div class="species-card">
+      <pre style="color:#d97706">${lines.map(l=>esc(l)).join("\n")}</pre>
+      <div class="sp-name">eye: ${esc(eye)}</div>
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  // 稀有度颜色对比
+  html += `<div class="rarity-section" style="margin-top:24px">
+    <div class="rarity-header">
+      <div class="label">稀有度颜色对比</div>
+      <div class="prob">同一物种（ghost）在不同稀有度下的显示颜色</div>
+    </div>
+    <div class="species-grid">`;
+
+  for(const rar of [...RARITIES].reverse()){
+    const hat = rar==="common"?"none":"crown";
+    const lines = sprite("ghost", "◉", hat);
+    const c = COLORS[rar];
+    html += `<div class="species-card" style="border-color:${c}30">
+      <pre style="color:${c}">${lines.map(l=>esc(l)).join("\n")}</pre>
+      <div class="sp-name" style="color:${c}">${STARS[rar]}</div>
+      <div class="sp-cn">${rar} (${W[rar]}%)</div>
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  document.getElementById("codex-content").innerHTML = html;
+}
+
+// 初始化
+buildCodex();
+
+// 回车触发
+document.getElementById("uid").addEventListener("keydown",e=>{if(e.key==="Enter")doRoll();});
+document.getElementById("saltInput").addEventListener("keydown",e=>{if(e.key==="Enter")doRoll();});
+</script>
+</body>
+</html>

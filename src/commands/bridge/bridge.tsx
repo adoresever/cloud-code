@@ -1,5 +1,5 @@
 import { c as _c } from "react/compiler-runtime";
-import { feature } from 'bun:bundle';
+import { feature } from 'bun:bundle'
 import { toString as qrToString } from 'qrcode';
 import * as React from 'react';
 import { useEffect, useState } from 'react';

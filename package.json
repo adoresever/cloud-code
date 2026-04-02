@@ -11,7 +11,7 @@
     ],
     "scripts": {
         "build": "bun build src/entrypoints/cli.tsx --outdir dist --target bun",
-        "dev": "bun run src/entrypoints/cli.tsx",
+        "dev": "bun --feature=BUDDY run src/entrypoints/cli.tsx",
         "wechat": "bun run scripts/wechat-bridge.ts",
         "wechat:login": "bun run scripts/wechat-bridge.ts --login",
         "prepublishOnly": "bun run build"

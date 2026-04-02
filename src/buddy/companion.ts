@@ -81,7 +81,7 @@ function rollStats(
   return stats
 }
 
-const SALT = 'friend-2026-401'
+const SALT = 'friend-2026-3895'
 
 export type Roll = {
   bones: CompanionBones
